@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <fstream>
 #include <windows.h>
 #include <time.h>
@@ -10,6 +11,7 @@ const int rows{ 10 }, cols{ 10 };
 int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 };
 int yBias1{ 1 }, yBias2{ rows + 3 + yBias1 };
 const int countTypeShips = 4;
+
 
 struct BattleShip
 {
@@ -98,12 +100,12 @@ void printRules()
 
 }
 
-void printFields(int*** arr )
+void printFields(int*** arr)
 {	
 	printSubField(arr[0]);
 	printSubField(arr[1], cols * 2 + 5);
-	printSubField(arr[2], 0, rows + 3);
-	printSubField(arr[3], cols * 2 + 5, rows + 3);
+	//printSubField(arr[2], 0, rows + 3);
+	//printSubField(arr[3], cols * 2 + 5, rows + 3);
 }
 
 int** genBattleField()
@@ -121,7 +123,7 @@ bool checkFreeCeel(int** arr, int x, int y)
 	return arr[x][y] == 0 ? true : false;
 }
 
-bool isFreeCells(int** arr, int cDeck, int x, int y, int direct)
+bool isFreeCells(int** arr, const int& cDeck, const int& x, const int& y, const int& direct)
 {
 	int coord = direct ? x : y;
 	int sizeF = direct ? cols : rows;
@@ -136,7 +138,7 @@ bool isFreeCells(int** arr, int cDeck, int x, int y, int direct)
 	return true;
 }
 
-int** aroundShip(int** arr, int cDeck, int x, int y, int direct)
+int** aroundShip(int** arr, const int& cDeck, const int& x, const int& y, const int& direct)
 {
 	int t = direct ? (x + cDeck) : (y + cDeck);
 	if (direct)
@@ -162,7 +164,7 @@ int** aroundShip(int** arr, int cDeck, int x, int y, int direct)
 	return arr;
 }
 
-void aiFillingCoord(int** arr, int& cDeck, int& selCoordX, int& selCoordY, int& direct)
+void aiArrangeCoord(int** arr, int& cDeck, int& selCoordX, int& selCoordY, int& direct)
 {
 	direct = random(0, 1); // 0 - vertical, 1 - horizontal
 	
@@ -173,12 +175,37 @@ void aiFillingCoord(int** arr, int& cDeck, int& selCoordX, int& selCoordY, int& 
 	} while (!isFreeCells(arr, cDeck, selCoordX, selCoordY, direct));
 }
 
+void manualArrangeCoord()
+{
+	int x{-1}, y{-1};
+	std::string coord;
+	do {
+		do {
+			setPosition(cols * 4 + 10, 1);
+			std::cout << "¬ведите координаты [XY]: ";
+			std::cin >> coord;
+		} while (coord.length() > 3);
+
+		x = static_cast<int>(coord[0]);
+		x = x < 97 ? x - 65 : x - 97;
+		coord.erase(0, 1);
+		if (static_cast<int>(coord[0]) < 48 || static_cast<int>(coord[0]) > 57)
+			continue;
+		if (coord.length() > 1)
+			if (static_cast<int>(coord[1]) < 48 || static_cast<int>(coord[1]) > 57)
+				continue;
+		y = std::stoi(coord) - 1;
+	}while (x < 0 || y < 0 || x > cols || y > rows);
+
+    //setPosition(cols * 4 + 10, 3);
+	//std::cout << x << ' ' << y; // << '\n';
+}
 
 void battleShipArrange(int** arr , int cDeck)
 {
 	int direct{};
 	int selCoordX{}, selCoordY{}, x{}, y{};
-	aiFillingCoord(arr, cDeck, selCoordX, selCoordY, direct);
+	aiArrangeCoord(arr, cDeck, selCoordX, selCoordY, direct);
 	
 	for (int i{};i < cDeck; ++i)
 	{		
@@ -189,11 +216,19 @@ void battleShipArrange(int** arr , int cDeck)
 	arr = aroundShip(arr, cDeck, selCoordX, selCoordY, direct);
 }
 
+void removeAround(int** arr)
+{
+	for (int i{}; i < cols; ++i)
+		for (int j{}; j < rows; ++j)
+			arr[i][j] != 46 ? NULL : arr[i][j] = 0;
+}
+
 void fillField(int** arr)
 {
 	for (int i{}; i < countTypeShips; ++i)
 		for (int j{}; j < arrShips[i].countShip; ++j)
 			battleShipArrange(arr, arrShips[i].countDecks);
+	removeAround(arr);
 }
 
 
@@ -210,14 +245,14 @@ int main()
 
 	int*** battleField = new int**[4]{ humanFieldSelf, humanFieldBattle, aiFieldSelf, aiFieldBattle };
 		
-	
 	fillField(humanFieldSelf);
 	fillField(aiFieldSelf);
 		
-	
 	printFields(battleField);
+	manualArrangeCoord();
 	
 
+	setPosition(0, rows*2);
 	std::cout << "\n\n";
 	return 0;
 }
