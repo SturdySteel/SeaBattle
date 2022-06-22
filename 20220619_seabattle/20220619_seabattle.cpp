@@ -8,15 +8,15 @@
 
 
 const int rows{ 10 }, cols{ 10 };
-int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 };
-int yBias1{ 1 }, yBias2{ rows + 3 + yBias1 };
+int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 } , xBias3{ cols * 4 + 10 };
+int yBias1{ 3 }, yBias2{ rows + 3 + yBias1 };
 const int countTypeShips = 4;
-
+char around = '.';
 
 struct BattleShip
 {
-	int countShip;
-	int countDecks;
+	int countShip = 0;
+	int countDecks = 0;
 	char deck = 'D';
 };
 
@@ -62,6 +62,12 @@ void showMessage(std::string message, ConsoleColor color = White, int pause = 0)
 	Sleep(pause);
 }
 
+void showMesPos(std::string message, int x, int y, ConsoleColor color = White, int pause = 0)
+{
+	setPosition(x, y);
+	showMessage(message, color, pause);
+}
+
 int random(int min = 0, int max = 9)
 {
 	return rand() % (max - min + 1) + min;
@@ -102,6 +108,7 @@ void printRules()
 
 void printFields(int*** arr)
 {	
+	//system("cls");
 	printSubField(arr[0]);
 	printSubField(arr[1], cols * 2 + 5);
 	//printSubField(arr[2], 0, rows + 3);
@@ -138,52 +145,77 @@ bool isFreeCells(int** arr, const int& cDeck, const int& x, const int& y, const 
 	return true;
 }
 
-int** aroundShip(int** arr, const int& cDeck, const int& x, const int& y, const int& direct)
+void aroundShip(int** arr, const int& cDeck, const int& x, const int& y, const int& direct)
 {
 	int t = direct ? (x + cDeck) : (y + cDeck);
 	if (direct)
 	{
 		for (int i{ x - 1 }; i < t + 1; ++i)
 		{
-			(y - 1) < 0 || i < 0 || i >= cols ? NULL : arr[i][y - 1] = '.';
-			(y + 1) >= rows || i < 0 || i >= cols ? NULL : arr[i][y + 1] = '.';
+			(y - 1) < 0 || i < 0 || i >= cols ? NULL : arr[i][y - 1] = around;
+			(y + 1) >= rows || i < 0 || i >= cols ? NULL : arr[i][y + 1] = around;
 		}
-		(x - 1) < 0 ? NULL : arr[x - 1][y] = '.';
-		t >= cols ? NULL : arr[t][y] = '.';
+		(x - 1) < 0 ? NULL : arr[x - 1][y] = around;
+		t >= cols ? NULL : arr[t][y] = around;
 	}
 	else 
 	{
 		for (int i{ y - 1 }; i < t + 1; ++i)
 		{
-			(x - 1) < 0 || i < 0 || i >= rows ? NULL : arr[x - 1][i] = '.';
-			(x + 1) >= cols || i < 0 || i >= rows ? NULL : arr[x + 1][i] = '.';
+			(x - 1) < 0 || i < 0 || i >= rows ? NULL : arr[x - 1][i] = around;
+			(x + 1) >= cols || i < 0 || i >= rows ? NULL : arr[x + 1][i] = around;
 		}
-		(y - 1) < 0 ? NULL : arr[x][y - 1] = '.';
-		t >= rows ? NULL : arr[x][t] = '.';
+		(y - 1) < 0 ? NULL : arr[x][y - 1] = around;
+		t >= rows ? NULL : arr[x][t] = around;
 	}
-	return arr;
+	//return arr;
 }
 
-void aiArrangeCoord(int** arr, int& cDeck, int& selCoordX, int& selCoordY, int& direct)
+void aiArrangeCoord(int** arr, int& cDeck, int& selX, int& selY, int& direct)
 {
 	direct = random(0, 1); // 0 - vertical, 1 - horizontal
 	
 	do {
-		selCoordX = random(0, cols - 1);
-		selCoordY = random(0, rows - 1);
+		selX = random(0, cols - 1);
+		selY = random(0, rows - 1);
 
-	} while (!isFreeCells(arr, cDeck, selCoordX, selCoordY, direct));
+	} while (!isFreeCells(arr, cDeck, selX, selY, direct));
 }
 
-void manualArrangeCoord()
+bool isYesNo(int xBias, int yBias, std::string message, bool cls = 1)
 {
-	int x{-1}, y{-1};
+	int inp{ -1 };
+
+	while (inp < 0 || inp > 1)
+	{
+		showMesPos("      ", xBias + message.length(), yBias);
+		showMesPos(message, xBias, yBias);
+		std::cin >> inp;
+		if (std::cin.fail())
+		{
+			std::cin.clear();
+			std::cin.ignore(32767, '\n');
+			inp = -1;
+			continue;
+		}
+		if (cls)
+			system("cls");
+	}
+	return inp;
+}
+
+void manualInputCoord(int& x, int& y, int xBias, int yBias, std::string message )
+{
+	//x = -1,	y = -1;
 	std::string coord;
+	//std::string text1 = ;
 	do {
-		do {
-			setPosition(cols * 4 + 10, 1);
-			std::cout << "Введите координаты [XY]: ";
+		do {			
+			showMesPos(message, xBias, yBias);			
+			showMesPos("      ", xBias + message.length(), yBias);
+			setPosition(xBias + message.length(), yBias);
 			std::cin >> coord;
+			std::cin.ignore(32767, '\n');
 		} while (coord.length() > 3);
 
 		x = static_cast<int>(coord[0]);
@@ -195,40 +227,53 @@ void manualArrangeCoord()
 			if (static_cast<int>(coord[1]) < 48 || static_cast<int>(coord[1]) > 57)
 				continue;
 		y = std::stoi(coord) - 1;
-	}while (x < 0 || y < 0 || x > cols || y > rows);
-
-    //setPosition(cols * 4 + 10, 3);
-	//std::cout << x << ' ' << y; // << '\n';
+	}while (x < 0 || y < 0 || x >= cols || y >= rows);	   
 }
 
-void battleShipArrange(int** arr , int cDeck)
+void battleShipArrange(int*** arr , int& sel, int& cDeck, bool avto, bool ai)
 {
 	int direct{};
-	int selCoordX{}, selCoordY{}, x{}, y{};
-	aiArrangeCoord(arr, cDeck, selCoordX, selCoordY, direct);
+	int selX{}, selY{}, x{}, y{};
+	if (avto)
+	{
+		aiArrangeCoord(arr[sel], cDeck, selX, selY, direct);
+		if(ai)
+			printFields(arr);
+	}
+	else
+	{
+		do {
+			system("cls");
+			printFields(arr);
+			std::string text = "Координаты [XY] для " + std::to_string(cDeck) + (cDeck == 1 ? "-но" : "-x") + " палубного: ";
+			manualInputCoord(selX, selY, xBias3, yBias1, text);
+			direct = cDeck == 1 ? 0 : isYesNo(xBias3, (yBias1 + 2), "Расположение [0 - верт. / 1 - гориз.] корабля?: ", 0);
+		} while (!isFreeCells(arr[sel], cDeck, selX, selY, direct));		
+	}
 	
 	for (int i{};i < cDeck; ++i)
 	{		
-		x = direct ? selCoordX + i : selCoordX;
-		y = direct ? selCoordY : selCoordY + i;
-		arr[x][y] = arrShips->deck;				
+		x = direct ? selX + i : selX;
+		y = direct ? selY : selY + i;
+		arr[sel][x][y] = arrShips->deck;				
 	}	
-	arr = aroundShip(arr, cDeck, selCoordX, selCoordY, direct);
+	aroundShip(arr[sel], cDeck, selX, selY, direct);
 }
 
 void removeAround(int** arr)
 {
 	for (int i{}; i < cols; ++i)
 		for (int j{}; j < rows; ++j)
-			arr[i][j] != 46 ? NULL : arr[i][j] = 0;
+			arr[i][j] != around ? NULL : arr[i][j] = 0;
 }
 
-void fillField(int** arr)
+
+void fillField(int*** arr ,int sel, bool avto, bool ai = false)
 {
 	for (int i{}; i < countTypeShips; ++i)
 		for (int j{}; j < arrShips[i].countShip; ++j)
-			battleShipArrange(arr, arrShips[i].countDecks);
-	removeAround(arr);
+			battleShipArrange(arr, sel, arrShips[i].countDecks, avto, ai);
+	removeAround(arr[sel]);
 }
 
 
@@ -244,12 +289,14 @@ int main()
 	int** aiFieldBattle = genBattleField();
 
 	int*** battleField = new int**[4]{ humanFieldSelf, humanFieldBattle, aiFieldSelf, aiFieldBattle };
+	
+	bool avto = isYesNo(xBias1, yBias1, "Размещение кораблей в [0 - ручн / 1 - авто ] режиме?:  ");
+
+	fillField(battleField, 0, avto);
+	fillField(battleField, 2, true, true);
 		
-	fillField(humanFieldSelf);
-	fillField(aiFieldSelf);
-		
-	printFields(battleField);
-	manualArrangeCoord();
+	//printFields(battleField);
+	//manualInputCoord();
 	
 
 	setPosition(0, rows*2);
