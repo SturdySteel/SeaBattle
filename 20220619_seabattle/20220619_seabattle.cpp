@@ -6,9 +6,25 @@
 
 
 
-const int rows{10},cols{ 10 };
+const int rows{ 10 }, cols{ 10 };
+int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 };
+int yBias1{ 1 }, yBias2{ rows + 3 + yBias1 };
+const int countTypeShips = 4;
 
+struct BattleShip
+{
+	int countShip;
+	int countDecks;
+	char deck = 'D';
+};
 
+BattleShip* arrShips = new BattleShip[countTypeShips]
+{
+	{ 1, 4 },	
+	{ 2, 3 },
+	{ 3, 2 },
+	{ 4, 1 }	
+};
 
 enum ConsoleColor
 {
@@ -44,7 +60,7 @@ void showMessage(std::string message, ConsoleColor color = White, int pause = 0)
 	Sleep(pause);
 }
 
-int random(int min =0, int max = 9)
+int random(int min = 0, int max = 9)
 {
 	return rand() % (max - min + 1) + min;
 }
@@ -53,22 +69,24 @@ int random(int min =0, int max = 9)
 void printSubField(int** arr, int xCoord = 0, int yCoord = 0)
 {
 	char s = 65;
-	short maxSymbol = s + cols;
+	int maxSymbol = s + cols;
 
 	for (int i{}; i < rows + 1; ++i)
 	{
-		setPosition(xCoord, yCoord + i);
+		setPosition(xCoord, yCoord + i );
 		for (int j{}; j < cols + 2; ++j)
 		{
 			if (i == 0 && s < maxSymbol)
 				j == 0 ? std::cout << "   " << s : std::cout << ' ' << s;
 			else if (j == 0)
 				i < 10 ? std::cout << ' ' << i : std::cout << i;
-			else if (i != 0)
+			else if (i > 0 && j < cols + 1)
 			{
-				char t = arr[i - 1][j - 1];
+				char t = arr[j - 1][i - 1];
 				t != 0 && j < cols + 1 ? std::cout << "|" << t : std::cout << "| ";
 			}
+			else if(i > 0 && j==cols+1)
+				std::cout << "|";
 			++s;
 		}
 	}
@@ -77,11 +95,6 @@ void printSubField(int** arr, int xCoord = 0, int yCoord = 0)
 void printRules()
 {
 	setPosition(cols * 3 + 10,1);
-
-}
-
-void printBattleShip()
-{
 
 }
 
@@ -95,31 +108,113 @@ void printFields(int*** arr )
 
 int** genBattleField()
 {
-	int** arr = new int* [rows];
+	int** arr = new int* [cols];
 
-	for (int i{}; i < rows; ++i)
-		arr[i] = new int[cols] {};
+	for (int i{}; i < cols; ++i)
+		arr[i] = new int[rows]{};
 		
 	return arr;
+}
+
+bool checkFreeCeel(int** arr, int x, int y)
+{
+	return arr[x][y] == 0 ? true : false;
+}
+
+bool isFreeCells(int** arr, int cDeck, int x, int y, int direct)
+{
+	int coord = direct ? x : y;
+	int sizeF = direct ? cols : rows;
+
+	if ((coord + cDeck - 1) > (sizeF - 1) && cDeck > 1)
+		return false;
+
+	for (int i{};i < cDeck; ++i)	
+		if (!checkFreeCeel(arr, direct ? x + i : x , direct ? y : y + i))
+			return false;
+
+	return true;
+}
+
+int** aroundShip(int** arr, int cDeck, int x, int y, int direct)
+{
+	int t = direct ? (x + cDeck) : (y + cDeck);
+	if (direct)
+	{
+		for (int i{ x - 1 }; i < t + 1; ++i)
+		{
+			(y - 1) < 0 || i < 0 || i >= cols ? NULL : arr[i][y - 1] = '.';
+			(y + 1) >= rows || i < 0 || i >= cols ? NULL : arr[i][y + 1] = '.';
+		}
+		(x - 1) < 0 ? NULL : arr[x - 1][y] = '.';
+		t >= cols ? NULL : arr[t][y] = '.';
+	}
+	else 
+	{
+		for (int i{ y - 1 }; i < t + 1; ++i)
+		{
+			(x - 1) < 0 || i < 0 || i >= rows ? NULL : arr[x - 1][i] = '.';
+			(x + 1) >= cols || i < 0 || i >= rows ? NULL : arr[x + 1][i] = '.';
+		}
+		(y - 1) < 0 ? NULL : arr[x][y - 1] = '.';
+		t >= rows ? NULL : arr[x][t] = '.';
+	}
+	return arr;
+}
+
+void aiFillingCoord(int** arr, int& cDeck, int& selCoordX, int& selCoordY, int& direct)
+{
+	direct = random(0, 1); // 0 - vertical, 1 - horizontal
+	
+	do {
+		selCoordX = random(0, cols - 1);
+		selCoordY = random(0, rows - 1);
+
+	} while (!isFreeCells(arr, cDeck, selCoordX, selCoordY, direct));
+}
+
+
+void battleShipArrange(int** arr , int cDeck)
+{
+	int direct{};
+	int selCoordX{}, selCoordY{}, x{}, y{};
+	aiFillingCoord(arr, cDeck, selCoordX, selCoordY, direct);
+	
+	for (int i{};i < cDeck; ++i)
+	{		
+		x = direct ? selCoordX + i : selCoordX;
+		y = direct ? selCoordY : selCoordY + i;
+		arr[x][y] = arrShips->deck;				
+	}	
+	arr = aroundShip(arr, cDeck, selCoordX, selCoordY, direct);
+}
+
+void fillField(int** arr)
+{
+	for (int i{}; i < countTypeShips; ++i)
+		for (int j{}; j < arrShips[i].countShip; ++j)
+			battleShipArrange(arr, arrShips[i].countDecks);
 }
 
 
 int main()
 {
 	setlocale(LC_ALL, "ru");
-		
+	srand(time(0));
+	rand();
+	
 	int** humanFieldSelf = genBattleField();
 	int** humanFieldBattle = genBattleField();
 	int** aiFieldSelf = genBattleField();
 	int** aiFieldBattle = genBattleField();
 
 	int*** battleField = new int**[4]{ humanFieldSelf, humanFieldBattle, aiFieldSelf, aiFieldBattle };
-
-	humanFieldSelf[0][2] = 72;
-	humanFieldBattle[3][3] = 72;
-	aiFieldSelf[5][5] = 72;
-	aiFieldBattle[9][9] = 72;
-
+		
+	
+	fillField(humanFieldSelf);
+	fillField(aiFieldSelf);
+		
+	
 	printFields(battleField);
 	
 
