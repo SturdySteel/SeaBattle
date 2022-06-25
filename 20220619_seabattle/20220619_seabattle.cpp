@@ -6,13 +6,20 @@
 #include <time.h>
 
 
+enum isAction {
+	play = 0,
+	save = 1000,
+	quit = 2000
+};
 
 const int rows{ 10 }, cols{ 10 };
 int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 } , xBias3{ cols * 4 + 10 };
 int yBias1{ 3 }, yBias2{ rows + 3 + yBias1 };
 const int countTypeShips{ 4 };
+int countHumShips{}, countAiShips{};
 char around{ '.' };
 char sankDeck{ 'X' };
+isAction action{ play };
 
 struct BattleShip {
 	int countShip{};
@@ -222,16 +229,32 @@ bool isYesNo(int xBias, int yBias, std::string message, bool cls = 1)
 	return inp;
 }
 
+bool isIterrupt(std::string coord)
+{
+	if (coord == "save")
+	{
+		action = save;
+		return true;
+	}
+	else if (coord == "exit")
+	{
+		action == quit;
+		return true;
+	}
+	return false;
+}
+
 void manualInputCoord(int& x, int& y, int xBias, int yBias, std::string message )
 {	
 	std::string coord;
-
 	do {		
 		do {			
 			showMesPos(message, xBias, yBias);			
 			showMesPos("      ", xBias + message.length(), yBias);
 			setPosition(xBias + message.length(), yBias);
 			std::cin >> coord;
+			if (isIterrupt(coord))
+				return;
 			std::cin.ignore(32767, '\n');
 		} while (coord.length() > 3);
 
@@ -244,7 +267,7 @@ void manualInputCoord(int& x, int& y, int xBias, int yBias, std::string message 
 			if (static_cast<int>(coord[1]) < 48 || static_cast<int>(coord[1]) > 57)
 				continue;
 		y = std::stoi(coord) - 1;
-	}while (x < 0 || y < 0 || x >= cols || y >= rows);	   
+	}while (x < 0 || y < 0 || x >= cols || y >= rows);	 	
 }
 
 void battleShipArrange(BS*** arr , int& sel, int& cDeck, bool avto)
@@ -285,12 +308,17 @@ void removeAround(BS** arr)
 			arr[i][j].deckSymbol != around ? NULL : arr[i][j].deckSymbol = 0;
 }
 
-void fillField(BS*** arr ,int sel, bool avto)
+int fillField(BS*** arr ,int sel, bool avto)
 {
+	int counter{};
 	for (int i{}; i < countTypeShips; ++i)
 		for (int j{}; j < arrShips[i].countShip; ++j)
+		{
 			battleShipArrange(arr, sel, arrShips[i].countDecks, avto);
+			++counter;
+		}
 	removeAround(arr[sel]);
+	return counter;
 }
 
 bool isSankShip(BS** arr, const int x, const int y)
@@ -316,61 +344,97 @@ bool isSankShip(BS** arr, const int x, const int y)
 	return false;
 }
 
-void humanMove(BS*** arr, const int& aiField, const int& humanField)
+bool isWinner()
 {
-	int x{}, y{};
+	if (countAiShips == 0)
+	{
+		showMesPos("ПОБЕДИЛ ИГРОК!!!", xBias3, yBias1 - 2, Red, 1500);
+		clearScreen();
+		return true;
+	}
+	if (countHumShips == 0)
+	{
+		showMesPos("ПОБЕДИЛ ИИ!!!", xBias3, yBias1 - 2, Red, 1500);
+		clearScreen();
+		return true;
+	}
+	return false;
+}
+
+void saveCoord(const int& x, const int& y, const int& sanked)
+{
+	if (sanked)
+		return;
+}
+
+void aiGenXY(int& x, int& y)
+{
+	genXYcoord(x, y);
+
+}
+
+bool attackMove(BS*** arr, const int& defField, const int& attField)
+{	
 	bool sanked{ false };
-	std::string text = "Координаты пуска торпеды: ";
 	bool move{ true };
+
+	std::string text = "Координаты пуска торпеды: ";
+	
 	do {		
-		manualInputCoord(x, y, xBias3, yBias1, text);
-		if (checkFreeCeel(arr[aiField], x, y) && arr[humanField + 1][x][y].deckSymbol != around)
+		int x{}, y{};
+		attField == 0 ? manualInputCoord(x, y, xBias3, yBias1, text) : aiGenXY(x,y);
+		if (action != 0)
+			return true;
+
+		if (checkFreeCeel(arr[defField], x, y) && arr[attField + 1][x][y].deckSymbol != around)
 		{
-			arr[humanField + 1][x][y].deckSymbol = around;
+			arr[attField + 1][x][y].deckSymbol = around;
+			arr[defField][x][y].deckSymbol = around;
 			printFields(arr);
 			errMes("Не попал!!!", xBias3 + text.length(), yBias1, Red, 1500);
 			move = false;
 		}
 		else
 		{
-			if (arr[humanField + 1][x][y].deckSymbol == around)
+			if (arr[attField + 1][x][y].deckSymbol == around)
 			{				
 				errMes("Сюда пуск был!!!", xBias3 + text.length(), yBias1, Red, 1500);				
 				continue;
 			}
 			else
-			{
-				//arr[humanField + 1][x][y].deckSymbol = sankDeck;
-				arr[aiField][x][y].deckSymbol = sankDeck;
-				arr[humanField + 1][x][y] = arr[aiField][x][y];
+			{				
+				arr[defField][x][y].deckSymbol = sankDeck;
+				arr[attField + 1][x][y] = arr[defField][x][y];
 				printFields(arr);
-				errMes("Попал!!!", xBias3 + text.length(), yBias1, Red, 1500);				
-				sanked = isSankShip(arr[aiField], x, y);
+				errMes("Попал!!!", xBias3 + text.length(), yBias1, Red, 1500);					
+				sanked = isSankShip(arr[defField], x, y);
+				attField == 2 ? saveCoord(x, y, sanked) : srand(time(0));
 			}
 			if (sanked)
 			{
-				aroundShip(arr[humanField + 1], x, y);
-				aroundShip(arr[aiField], x, y);
+				aroundShip(arr[attField + 1], x, y);
+				aroundShip(arr[defField], x, y);
 				printFields(arr);
 				errMes("Затопил!!!", xBias3 + text.length(), yBias1, Red, 1500);
+				attField == 0 ? --countAiShips : --countHumShips;
+				if (isWinner()) 					
+					return true;
 				sanked = false;
 			}
 		}
 	} while (move);
-}
-
-void aiMove(BS*** arr, int& humanField, int& aiField)
-{
-	
+	return false;
 }
 
 void fighting(BS*** arr)
 {
-	int humanField{ 0 }, aiField{ 2 };
+	int hFd{ 0 }, aFd{ 2 };
+	int i{2};
 	while (true)
-	{
-		humanMove(arr, aiField, humanField);
-		aiMove(arr, humanField, aiField);
+	{		
+		if (attackMove(arr, (i % 2) ? hFd : aFd, (i % 2) ? aFd : hFd))
+			break;
+		++i;		
 	}
 }
 
@@ -379,6 +443,8 @@ int main()
 	setlocale(LC_ALL, "ru");
 	srand(time(0));
 	rand();
+
+	action = play;
 	
 	BS** humanFieldSelf = genBattleField();
 	BS** humanFieldBattle = genBattleField();
@@ -389,8 +455,8 @@ int main()
 	
 	bool avto = isYesNo(xBias1, yBias1, "Размещение кораблей в [0 - ручн / 1 - авто ] режиме?:  ");
 
-	fillField(battleField, 0, avto);
-	fillField(battleField, 2, true);
+	countHumShips =  fillField(battleField, 0, avto);
+	countAiShips = fillField(battleField, 2, true);
 		
 	printFields(battleField);
 	
