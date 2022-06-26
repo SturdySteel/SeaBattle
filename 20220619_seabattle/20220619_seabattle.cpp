@@ -6,20 +6,32 @@
 #include <time.h>
 
 
-enum isAction {
+enum Action {
 	play = 0,
 	save = 1000,
 	quit = 2000
 };
 
+enum Compass {
+	none = -1,
+	east = 0,
+	south,
+	west,
+	north
+	
+};
+
 const int rows{ 10 }, cols{ 10 };
-int xBias1{ 3 }, xBias2{ cols * 2 + xBias1 } , xBias3{ cols * 4 + 10 };
-int yBias1{ 3 }, yBias2{ rows + 3 + yBias1 };
+int xBias1{ 3 }, xBias3{ cols * 4 + 10 };
+int yBias1{ 3 };
 const int countTypeShips{ 4 };
 int countHumShips{}, countAiShips{};
 char around{ '.' };
 char sankDeck{ 'X' };
-isAction action{ play };
+int xHit{}, yHit{};
+Action action{ play };
+Compass  lastDir{ none };
+int countChangeDir{};
 
 struct BattleShip {
 	int countShip{};
@@ -35,6 +47,7 @@ struct BS {
 	int status{};
 	char deckSymbol{};
 };
+
 
 BattleShip* arrShips = new BattleShip[countTypeShips]
 {
@@ -361,16 +374,93 @@ bool isWinner()
 	return false;
 }
 
-void saveCoord(const int& x, const int& y, const int& sanked)
+void saveHitCoord(const int& x, const int& y, const int& sanked)
 {
 	if (sanked)
 		return;
+	xHit = x;
+	yHit = y;
+}
+
+void changeDirect()
+{
+	if (countChangeDir >= 2)
+	{
+		lastDir >= 2 ? lastDir = (Compass)(lastDir - 1) : lastDir = (Compass)(lastDir + 1);
+		countChangeDir = 0;
+	}
+	if (lastDir == south) 
+		lastDir = north;		
+	else if(lastDir == north)
+		lastDir = south;
+	else if (lastDir == east)
+		lastDir = west;
+	else if (lastDir == west)
+		lastDir = east;			
+}
+void genAIdir()
+{
+	lastDir = static_cast<Compass>(random(east, north));
 }
 
 void aiGenXY(int& x, int& y)
 {
-	genXYcoord(x, y);
-
+	if (lastDir == none)
+	{
+		genXYcoord(x, y);		
+		return;
+	}
+	if(lastDir == none)
+		genAIdir();	
+	x = xHit;
+	y = yHit;
+	while (true)
+	{
+		switch (lastDir)
+		{
+		case(east):
+		{
+			if (x + 1 >= cols)
+			{
+				lastDir = west;
+				continue;
+			}
+			++x;
+			return;
+		}
+		case(south):
+		{
+			if (y + 1 >= rows)
+			{
+				lastDir = north;
+				continue;
+			}
+			++y;
+			return;
+		}
+		case(west):
+		{
+			if (x - 1 < 0)
+			{
+				lastDir = east;
+				continue;
+			}
+			--x;
+			return;
+		}
+		case(north):
+		{
+			if(y - 1 < 0)
+			{
+				lastDir = south;
+				continue;
+			}
+			--y;
+			return;
+		}
+		}
+	}
+		
 }
 
 bool attackMove(BS*** arr, const int& defField, const int& attField)
@@ -386,19 +476,27 @@ bool attackMove(BS*** arr, const int& defField, const int& attField)
 		if (action != 0)
 			return true;
 
-		if (checkFreeCeel(arr[defField], x, y) && arr[attField + 1][x][y].deckSymbol != around)
+		if (checkFreeCeel(arr[defField], x, y))
 		{
 			arr[attField + 1][x][y].deckSymbol = around;
 			arr[defField][x][y].deckSymbol = around;
 			printFields(arr);
 			errMes("Не попал!!!", xBias3 + text.length(), yBias1, Red, 1500);
+			if (lastDir != none)
+			{
+				//saveHitCoord(x, y, sanked);
+				++countChangeDir;
+				changeDirect();				
+			}
 			move = false;
 		}
 		else
 		{
-			if (arr[attField + 1][x][y].deckSymbol == around)
+			if (arr[attField + 1][x][y].deckSymbol == around || arr[attField + 1][x][y].deckSymbol == sankDeck)
 			{				
-				errMes("Сюда пуск был!!!", xBias3 + text.length(), yBias1, Red, 1500);				
+				attField == 2 ? srand(time(0)) : errMes("Сюда пуск был!!!", xBias3 + text.length(), yBias1, Red, 1500) ;
+				arr[defField][x][y].deckSymbol == around ? changeDirect(): srand(time(0));
+				//attField == 2 ? saveHitCoord(x, y, sanked) : srand(time(0));				
 				continue;
 			}
 			else
@@ -406,9 +504,11 @@ bool attackMove(BS*** arr, const int& defField, const int& attField)
 				arr[defField][x][y].deckSymbol = sankDeck;
 				arr[attField + 1][x][y] = arr[defField][x][y];
 				printFields(arr);
-				errMes("Попал!!!", xBias3 + text.length(), yBias1, Red, 1500);					
+				errMes("Попал!!!", xBias3 + text.length(), yBias1, Red, 1500);		
+				if (lastDir == none)
+					genAIdir();
 				sanked = isSankShip(arr[defField], x, y);
-				attField == 2 ? saveCoord(x, y, sanked) : srand(time(0));
+				attField == 2 ? saveHitCoord(x, y, sanked) : srand(time(0));
 			}
 			if (sanked)
 			{
@@ -419,6 +519,12 @@ bool attackMove(BS*** arr, const int& defField, const int& attField)
 				attField == 0 ? --countAiShips : --countHumShips;
 				if (isWinner()) 					
 					return true;
+				if (attField == 2)
+				{
+					xHit = 0, yHit = 0;
+					lastDir = none;
+					countChangeDir = 0;
+				}
 				sanked = false;
 			}
 		}
@@ -463,7 +569,8 @@ int main()
 	fighting(battleField);
 
 
-	//setPosition(0, rows*2);
+	setPosition(0, rows*2);
 	std::cout << "\n\n";
 	return 0;
 }
+
